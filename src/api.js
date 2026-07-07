@@ -36,3 +36,21 @@ export async function searchCards(query) {
     marketPrice: extractPrice(c),
   }))
 }
+
+// Fetch the current real-world market price for a set of catalog card ids.
+// Returns a map { [id]: price }. Ids with no usable price are omitted.
+export async function fetchPrices(ids) {
+  const unique = [...new Set(ids)].filter(Boolean)
+  if (unique.length === 0) return {}
+  const q = unique.map((id) => `id:${id}`).join(' OR ')
+  const url = `${BASE}?q=${encodeURIComponent(q)}&pageSize=${unique.length}`
+  const res = await fetch(url, { headers: { Accept: 'application/json' } })
+  if (!res.ok) throw new Error(`API responded ${res.status}`)
+  const json = await res.json()
+  const out = {}
+  for (const c of json.data || []) {
+    const p = extractPrice(c)
+    if (p != null) out[c.id] = p
+  }
+  return out
+}

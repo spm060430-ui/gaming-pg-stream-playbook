@@ -10,9 +10,11 @@ across your whole collection.
 
 - **Add your stock** — search the real [PokémonTCG catalog](https://pokemontcg.io)
   to autofill card art + a real base price, or add any card manually.
-- **Live market** — every card's price follows a simulated random walk with mild
-  mean-reversion, so values fluctuate believably second-to-second. Pause/resume
-  anytime with the **Market live** toggle.
+- **Real live pricing** — cards added from the catalog (**LIVE**) re-anchor to
+  the current real TCGplayer / Cardmarket price every 10 minutes (and on demand
+  via the sync button). The simulated ticker then adds believable second-to-second
+  motion *around* that true value. Manually-added cards (**SIM**) run on a fully
+  simulated price. Pause/resume the ticker with the toggle.
 - **Per-card cards** — live price, % change, a sparkline of recent movement, the
   quantity you own, your holding value, and P/L vs. what you paid.
 - **Portfolio summary** — total value, cost basis, overall profit/loss, and card
@@ -42,13 +44,15 @@ npm run preview # serve the built bundle
 |------|---------|
 | `src/App.jsx` | UI: portfolio summary, card grid, add-card modal |
 | `src/market.js` | The simulated market engine (random walk + mean-reversion) |
-| `src/api.js` | Optional PokémonTCG catalog search (images + base prices) |
+| `src/api.js` | PokémonTCG catalog search + live price sync by card id |
 | `src/storage.js` | `localStorage` persistence |
 | `src/Sparkline.jsx` | Dependency-free inline-SVG price sparkline |
 
 ### About the prices
 
-Base prices, when a card is found in the catalog, come from real TCGplayer /
-Cardmarket data. The **fluctuation** is a client-side simulation for tracking and
-entertainment — it is not live trading data. If the catalog can't be reached,
-you can still add cards manually and the market runs on the price you enter.
+For **LIVE** cards, the base value is the real TCGplayer / Cardmarket market
+price, refreshed from the catalog every 10 minutes (TCG prices update roughly
+daily, so this is real market data, not tick-by-tick trading). The
+second-to-second **fluctuation** on top is a client-side simulation for a live
+feel. If the catalog can't be reached, you can still add cards manually
+(**SIM**) and the market runs on the price you enter.
