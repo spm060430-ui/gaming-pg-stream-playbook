@@ -36,8 +36,10 @@ export default function App() {
   // Live real-world price sync: 'idle' | 'syncing' | 'ok' | 'error'
   const [syncState, setSyncState] = useState('idle')
   const [lastSync, setLastSync] = useState(null)
+  const [showMenu, setShowMenu] = useState(false)
   const timer = useRef(null)
   const cardsRef = useRef(cards)
+  const fileInput = useRef(null)
 
   // Persist whenever the collection changes, and keep a live ref for the
   // sync loop (which needs the current ids without waiting on a re-render).
@@ -127,6 +129,101 @@ export default function App() {
     )
   }
 
+  function download(filename, text, type) {
+    const blob = new Blob([text], { type })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const stamp = () => new Date().toISOString().slice(0, 10)
+
+  function exportJSON() {
+    setShowMenu(false)
+    download(
+      `pokestock-collection-${stamp()}.json`,
+      JSON.stringify(cards, null, 2),
+      'application/json',
+    )
+  }
+
+  function exportCSV() {
+    setShowMenu(false)
+    const cols = ['name', 'set', 'number', 'rarity', 'quantity', 'buyPrice', 'price', 'basePrice', 'source']
+    const esc = (v) => {
+      const s = String(v ?? '')
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    }
+    const rows = cards.map((c) =>
+      cols
+        .map((k) =>
+          k === 'source'
+            ? c.catalogId ? 'LIVE' : 'SIM'
+            : k === 'price' || k === 'buyPrice' || k === 'basePrice'
+            ? esc(Number(c[k]).toFixed(2))
+            : esc(c[k]),
+        )
+        .join(','),
+    )
+    download(`pokestock-collection-${stamp()}.csv`, [cols.join(','), ...rows].join('\n'), 'text/csv')
+  }
+
+  function importJSON(e) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-importing the same file later
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result))
+        if (!Array.isArray(parsed)) throw new Error('not an array')
+        // Re-hydrate defensively so a partial/older export still runs.
+        const restored = parsed
+          .filter((c) => c && typeof c.name === 'string')
+          .map((c) => {
+            const base = Number(c.basePrice ?? c.price ?? 1) || 1
+            const price = Number(c.price ?? base) || base
+            return {
+              ...marketParams(),
+              ...c,
+              id: c.id || uid(),
+              quantity: Math.max(1, Number(c.quantity) || 1),
+              buyPrice: Number(c.buyPrice ?? base) || base,
+              basePrice: base,
+              price,
+              prevPrice: Number(c.prevPrice ?? price) || price,
+              openPrice: Number(c.openPrice ?? price) || price,
+              history: Array.isArray(c.history) && c.history.length ? c.history : [price],
+            }
+          })
+        if (restored.length === 0) throw new Error('no valid cards')
+        const replace =
+          cards.length === 0 ||
+          window.confirm(
+            `Import ${restored.length} card(s)? This replaces your current collection of ${cards.length}.`,
+          )
+        if (replace) setCards(restored)
+      } catch {
+        window.alert('That file could not be imported — it must be a PokéStock JSON export.')
+      }
+    }
+    reader.readAsText(file)
+    setShowMenu(false)
+  }
+
+  function clearAll() {
+    setShowMenu(false)
+    if (cards.length === 0) return
+    if (window.confirm(`Remove all ${cards.length} card(s) from your collection? This cannot be undone.`)) {
+      setCards([])
+    }
+  }
+
   const totals = useMemo(() => {
     let value = 0
     let cost = 0
@@ -168,6 +265,49 @@ export default function App() {
           <button className="primary" onClick={() => setShowAdd(true)}>
             + Add card
           </button>
+          <div className="menu-wrap">
+            <button
+              className="ghost icon-btn"
+              onClick={() => setShowMenu((v) => !v)}
+              aria-label="More actions"
+              aria-expanded={showMenu}
+              title="Backup & manage"
+            >
+              ⋯
+            </button>
+            {showMenu && (
+              <>
+                <div className="menu-backdrop" onClick={() => setShowMenu(false)} />
+                <div className="menu" role="menu">
+                  <button role="menuitem" onClick={exportJSON} disabled={cards.length === 0}>
+                    ⬇ Export JSON (backup)
+                  </button>
+                  <button role="menuitem" onClick={exportCSV} disabled={cards.length === 0}>
+                    ⬇ Export CSV (spreadsheet)
+                  </button>
+                  <button role="menuitem" onClick={() => fileInput.current?.click()}>
+                    ⬆ Import JSON…
+                  </button>
+                  <div className="menu-sep" />
+                  <button
+                    role="menuitem"
+                    className="danger"
+                    onClick={clearAll}
+                    disabled={cards.length === 0}
+                  >
+                    🗑 Clear all cards
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+          <input
+            ref={fileInput}
+            type="file"
+            accept="application/json,.json"
+            onChange={importJSON}
+            hidden
+          />
         </div>
       </header>
 

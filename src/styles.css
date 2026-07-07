@@ -92,6 +92,45 @@ button:active { transform: translateY(1px); }
 }
 .ghost:hover { border-color: var(--accent); }
 
+/* Overflow menu (backup & manage) */
+.menu-wrap { position: relative; }
+.icon-btn {
+  padding: 10px 12px;
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 700;
+}
+.menu-backdrop { position: fixed; inset: 0; z-index: 40; }
+.menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 41;
+  min-width: 230px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.menu button {
+  text-align: left;
+  background: transparent;
+  color: var(--text);
+  border: none;
+  padding: 9px 10px;
+  border-radius: 8px;
+  font-size: 13.5px;
+}
+.menu button:hover:not(:disabled) { background: var(--panel-2); }
+.menu button:disabled { opacity: 0.4; cursor: not-allowed; }
+.menu button.danger { color: var(--down); }
+.menu button.danger:hover:not(:disabled) { background: rgba(255, 93, 108, 0.12); }
+.menu-sep { height: 1px; background: var(--border); margin: 4px 2px; }
+
 /* Live-price sync pill */
 .sync-pill { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; }
 .sync-pill:disabled { opacity: 0.8; cursor: default; }

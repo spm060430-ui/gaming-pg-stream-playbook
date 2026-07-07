@@ -21,6 +21,9 @@ across your whole collection.
   count, all updating in real time.
 - **Persistent** — your collection is saved to the browser's `localStorage`, so
   it's still there when you come back.
+- **Backup & manage** — the **⋯** menu exports your collection as JSON (a full
+  backup you can re-import) or CSV (for a spreadsheet), imports a JSON backup,
+  and clears the whole collection. Destructive actions ask for confirmation.
 
 ## Run it
 
