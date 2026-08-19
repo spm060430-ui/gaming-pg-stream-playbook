@@ -1,9 +1,9 @@
 {
-  "name": "poke-stock",
+  "name": "daytrader-sim",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Pokémon card portfolio tracker with a live, fluctuating market.",
+  "description": "DayTrader — a paper-trading simulator with real, live crypto prices.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
