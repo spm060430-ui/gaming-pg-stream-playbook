@@ -31,7 +31,9 @@ weekday evening. If the PC is off at run time, that day is simply skipped
 from __future__ import annotations
 
 import argparse
+import sys
 from datetime import datetime, timezone
+from typing import List, Tuple
 
 from swingbot import strategy
 from swingbot.config import load_config
@@ -53,6 +55,40 @@ ACTION_MAP = {
 }
 
 
+def show_popup(title: str, message: str) -> None:
+    """Pop up a message box on Windows; elsewhere just print it.
+
+    Uses ctypes (built into Python) so there is nothing to install. When run by
+    Windows Task Scheduler with 'run only when user is logged on', this appears
+    on the desktop.
+    """
+    print("\n" + "=" * 50 + f"\n{title}\n{message}\n" + "=" * 50)
+    if sys.platform.startswith("win"):
+        try:
+            import ctypes
+
+            # 0x40 = information icon, 0x1000 = show on top.
+            ctypes.windll.user32.MessageBoxW(0, message, title, 0x40 | 0x1000)
+        except Exception as e:  # noqa: BLE001
+            log.warning("Could not show popup: %s", e)
+
+
+def build_popup_text(today, raw_signals: List[Tuple[str, str]]) -> str:
+    """Turn the day's raw signals into a plain-English 'what to do' message."""
+    buys = [sym for sym, action in raw_signals if action == LONG_ENTRY]
+    sells = [sym for sym, action in raw_signals if action in (LONG_EXIT, SHORT_ENTRY)]
+    lines = [f"Robot check for {today}:", ""]
+    if buys:
+        lines.append("BUY signal:  " + ", ".join(buys))
+        lines.append("   -> open TradingView and tap BUY.")
+    if sells:
+        lines.append("SELL / CLOSE signal:  " + ", ".join(sells))
+        lines.append("   -> open TradingView and tap CLOSE.")
+    if not buys and not sells:
+        lines.append("No signal today. Nothing to do. :)")
+    return "\n".join(lines)
+
+
 def main() -> None:
     cfg = load_config()
     setup_logging(cfg.log_dir)
@@ -61,6 +97,9 @@ def main() -> None:
     ap.add_argument("--source", default="yfinance",
                     choices=["yfinance", "synthetic", "csv"],
                     help="Where to get the daily bars for signals (default yfinance).")
+    ap.add_argument("--popup", action="store_true",
+                    help="Pop up a plain-English 'what to do' message when done "
+                         "(used by the daily scheduled run).")
     args = ap.parse_args()
 
     today = datetime.now(timezone.utc).date()
@@ -94,6 +133,7 @@ def main() -> None:
         raise SystemExit(f"Data fetch failed: {e}")
 
     # 2 + 3) signals -> engine (which does risk + optional order)
+    raw_signals: List[Tuple[str, str]] = []
     for sym in cfg.watchlist:
         df = bars.get(sym)
         if df is None or df.empty:
@@ -103,6 +143,7 @@ def main() -> None:
         if sig is None:
             log.info("%s: not enough history yet, skipping", sym)
             continue
+        raw_signals.append((sym, sig.action))
         action = ACTION_MAP.get(sig.action)
         if action is None:
             log.info("%s: HOLD (%s)", sym, sig.reason)
@@ -129,6 +170,13 @@ def main() -> None:
     report = build_daily_report(cfg, broker)
     print()
     print(report)
+
+    # 5) plain-English 'what to do' popup (for the scheduled daily run)
+    popup_text = build_popup_text(today, raw_signals)
+    if args.popup:
+        show_popup("Swing Robot - daily check", popup_text)
+    else:
+        log.info("Summary: %s", popup_text.replace("\n", " | "))
 
 
 if __name__ == "__main__":
