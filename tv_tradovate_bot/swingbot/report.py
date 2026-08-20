@@ -27,16 +27,25 @@ def build_daily_report(cfg: Config, broker) -> str:
     equity = cash = 0.0
     positions_lines: List[str] = []
     broker_err: Optional[str] = None
+    have_real_equity = False
     if broker is not None:
         try:
             acct = broker.get_account()
             equity, cash = acct.equity, acct.cash
+            have_real_equity = True
             for sym, p in broker.list_positions().items():
                 positions_lines.append(
                     f"  {sym:<8} {p.side:<5} net={p.net_pos:<3} avg=${p.avg_price:,.2f}"
                 )
         except Exception as e:  # noqa: BLE001
             broker_err = str(e)
+
+    # In dry-run (or if the broker read failed) there is no real equity. Fall
+    # back to the same assumed equity the engine uses so the circuit-breaker
+    # math doesn't compute a bogus 100% loss against a phantom $0.
+    if not have_real_equity:
+        equity = float(os.getenv("DRY_RUN_EQUITY", "3000"))
+        cash = equity
 
     roll_equity_marks(state, equity, run_time.date())
     cb = risk.evaluate_circuit_breakers(
@@ -50,7 +59,8 @@ def build_daily_report(cfg: Config, broker) -> str:
         "=" * 60,
         "",
         "ACCOUNT",
-        f"  Equity (netLiq): ${equity:,.2f}",
+        f"  Equity (netLiq): ${equity:,.2f}"
+        + ("" if have_real_equity else "  (assumed - dry-run, not real)"),
         f"  Cash           : ${cash:,.2f}",
     ]
     if broker_err:
