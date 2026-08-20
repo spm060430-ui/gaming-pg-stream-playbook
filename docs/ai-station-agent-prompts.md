@@ -11,6 +11,13 @@ to mean unsupervised — it means the limits are decided up front instead of
 case-by-case. **Adjust the numbers in brackets to your actual risk tolerance
 before this touches real money.**
 
+> 🛠️ **A runnable implementation of this pack lives in [`../agents`](../agents).**
+> It wires the three prompts into a Claude-driven orchestrator that runs in
+> paper mode against simulated feeds, with the bracketed limits below filled in
+> ([`agents/config.js`](../agents/config.js)) and — crucially — *enforced in
+> code* by a deterministic risk engine, not just stated in the prompts. See
+> [`agents/README.md`](../agents/README.md).
+
 ---
 
 ## 1. Manager Agent ("Station Commander")

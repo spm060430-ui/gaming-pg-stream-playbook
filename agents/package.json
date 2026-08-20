@@ -1,0 +1,19 @@
+{
+  "name": "ai-station",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Station Commander + Futures Desk + Book Desk — a paper-trading three-agent orchestrator with code-enforced risk limits.",
+  "bin": {
+    "ai-station": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js run",
+    "dry": "node src/index.js run --dry --ticks 6",
+    "report": "node src/index.js run --ticks 12 --report-only",
+    "test": "node test/riskEngine.test.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0"
+  }
+}
