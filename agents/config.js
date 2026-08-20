@@ -19,11 +19,15 @@ export const config = {
   //            broker or sportsbook is a deliberate act you take on yourself.
   mode: "paper",
 
-  // ---- Model ------------------------------------------------------------
-  // The Claude model each agent uses to make decisions. Override with the
-  // AI_STATION_MODEL env var. Any current model id works; a cheaper/faster
-  // model is a reasonable choice for high-frequency decisions.
-  model: process.env.AI_STATION_MODEL || "claude-opus-5",
+  // ---- Models -----------------------------------------------------------
+  // Two roles, two models. The Commander is oversight — it runs once per cycle
+  // and its judgment gates real money, so it gets the stronger model. The desks
+  // make the high-frequency, in-the-weeds decisions, so they default to a
+  // cheaper/faster model. Override either with an env var or a CLI flag.
+  models: {
+    commander: process.env.AI_STATION_MODEL || "claude-opus-5",
+    worker: process.env.AI_STATION_WORKER_MODEL || "claude-haiku-4-5",
+  },
 
   // ---- Master ledger (Station Commander) --------------------------------
   bankroll: 10_000, // total capital under management

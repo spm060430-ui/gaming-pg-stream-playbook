@@ -64,7 +64,25 @@ node src/index.js run [--ticks N] [--dry] [--report-only] [--model ID]
 | `--dry` | Never call the API; use deterministic stubs. Auto-enabled when no `ANTHROPIC_API_KEY` is set. |
 | `--ticks N` | Number of decision cycles. One cycle == one simulated hour. |
 | `--report-only` | Suppress per-tick lines; print only day/final summaries. |
-| `--model ID` | Override the Claude model (default `claude-opus-5`, or `AI_STATION_MODEL`). |
+| `--model ID` | Override the **Commander** (oversight) model. Default `claude-opus-5` / `AI_STATION_MODEL`. |
+| `--worker-model ID` | Override the **desks'** (high-frequency) model. Default `claude-haiku-4-5` / `AI_STATION_WORKER_MODEL`. |
+| `--out FILE` | Where to write the JSON run log. Default `runs/run-<timestamp>.json`. |
+| `--no-log` | Don't write a run log. |
+
+### Two models, two roles
+
+The Commander runs once per cycle and its judgment gates real money, so it gets
+the stronger model (`claude-opus-5`). The two desks make the high-frequency,
+in-the-weeds calls, so they default to a cheaper, faster model
+(`claude-haiku-4-5`). Tune both in [`config.js`](config.js) under `models`, via
+env vars, or with the flags above.
+
+### Run logs
+
+Every run (unless `--no-log`) writes a structured JSON record to `runs/` (which
+is git-ignored): metadata, the exact risk limits in force, the final ledger,
+per-desk reports, and every logged event including guardrail rejections. Useful
+for after-the-fact analysis and audits.
 
 ## How a cycle works
 
