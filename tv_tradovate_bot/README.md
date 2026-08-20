@@ -162,6 +162,9 @@ tv_tradovate_bot/
 │   ├── state.py                 # positions/equity marks/halt flag (JSON)
 │   ├── report.py, notify.py, logging_setup.py, synthetic.py
 ├── run_backtest.py  run_relay.py  run_report.py
+├── Dockerfile  docker-compose.yml   # relay container + optional public tunnel
+├── scripts/smoke_webhook.sh         # prove the webhook path before TradingView
+├── SETUP_TRADINGVIEW.md             # step-by-step testing guide
 ├── tests/                       # pytest: indicators, risk, engine, backtest
 ├── requirements.txt   .env.example
 ```
@@ -192,9 +195,11 @@ pytest -q                     # 16 tests should pass
 2. **TradingView paper.** Add `pine/swing_strategy.pine` to an `MNQ1!` or
    `MGC1!` daily chart. Use the Strategy Tester and TradingView **paper trading**
    to watch it operate with no money at risk.
-3. **Relay in dry-run.** `RELAY_DRY_RUN=true python3 run_relay.py`. Point a
-   TradingView alert at it and confirm every decision is computed and logged but
-   **no order is placed**. This validates the wiring end-to-end.
+3. **Relay in dry-run.** Stand the relay up at a public HTTPS URL, point a
+   TradingView alert at it, and confirm every decision is computed and logged but
+   **no order is placed**. Full click-path in **[SETUP_TRADINGVIEW.md](SETUP_TRADINGVIEW.md)**.
+   Fastest start: `docker compose --profile tunnel up --build` gives you a
+   relay + a public `trycloudflare.com` URL in one command.
 4. **Tradovate DEMO.** Set `RELAY_DRY_RUN=false`, `TRADOVATE_ENV=demo`, and real
    Tradovate API credentials. Run for **4–6 weeks**. Compare the daily reports to
    TradingView’s own paper results — they should track closely.
@@ -205,6 +210,22 @@ pytest -q                     # 16 tests should pass
 ---
 
 ## Wiring TradingView → relay → Tradovate
+
+> The full, click-by-click version — including the exact alert message and
+> input settings — is in **[SETUP_TRADINGVIEW.md](SETUP_TRADINGVIEW.md)**. This
+> is the summary.
+
+**0. Deploy the relay.** Easiest for testing:
+
+```bash
+cp .env.example .env            # set WEBHOOK_SECRET, keep RELAY_DRY_RUN=true
+docker compose --profile tunnel up --build
+# relay on :8000; the cloudflared logs print your public https://…trycloudflare.com URL
+```
+
+Relay only (bring your own TLS/tunnel): `docker compose up -d`, or without
+Docker: `pip install -r requirements.txt && python run_relay.py`. Prove the wiring
+before TradingView with `WEBHOOK_SECRET=… ./scripts/smoke_webhook.sh <url>`.
 
 **1. Host the relay** somewhere with a public HTTPS URL (a small VPS, or a tunnel
 like Cloudflare Tunnel / ngrok in front of `run_relay.py`). TradingView must be

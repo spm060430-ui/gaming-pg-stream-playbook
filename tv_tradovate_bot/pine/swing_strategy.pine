@@ -10,10 +10,12 @@
 // Keep these inputs in sync with the Python config (swingbot/config.py) so the
 // research backtester and live trading agree.
 //
-// Alert wiring (see README): create ONE alert on this strategy with condition
-// "Any alert() function call", and paste {{strategy.order.alert_message}} as the
-// message (or leave the message box empty -- the alert_message we build below is
-// used). Point the webhook URL at your relay's /webhook endpoint.
+// Alert wiring (see SETUP_TRADINGVIEW.md): create ONE alert with this strategy
+// as the condition, set the message box to EXACTLY:
+//     {{strategy.order.alert_message}}
+// and set the Webhook URL (Notifications tab) to  https://<your-host>/webhook
+// Every entry/exit/stop below sets an alert_message, so each order fill delivers
+// the correct JSON to the relay. One alert per chart; use one chart per symbol.
 // =============================================================================
 strategy("Swing EMA+RSI (MNQ/MGC)", overlay=true, calc_on_every_tick=false,
      pyramiding=0, default_qty_type=strategy.fixed, default_qty_value=1,
@@ -68,8 +70,12 @@ shortStop = close + atrMult * atrVal
 
 if longEntry
     strategy.entry("Long", strategy.long, alert_message=f_msg("long_entry"))
+// The stop exit also carries a "long_exit" message so that if TradingView's
+// stop fills, the relay flattens Tradovate too (kept in sync with the relay's
+// own resting broker stop).
 if strategy.position_size > 0
-    strategy.exit("LongStop", from_entry="Long", stop=longStop)
+    strategy.exit("LongStop", from_entry="Long", stop=longStop,
+         alert_message=f_msg("long_exit"))
 if longExit
     strategy.close("Long", alert_message=f_msg("long_exit"))
 
@@ -77,10 +83,10 @@ if allowShorts
     if shortEntry
         strategy.entry("Short", strategy.short, alert_message=f_msg("short_entry"))
     if strategy.position_size < 0
-        strategy.exit("ShortStop", from_entry="Short", stop=shortStop)
+        strategy.exit("ShortStop", from_entry="Short", stop=shortStop,
+             alert_message=f_msg("short_exit"))
     if shortExit
         strategy.close("Short", alert_message=f_msg("short_exit"))
 
-// NOTE: alert_message on entry/exit fires only when the corresponding order
-// executes. Create the alert with "Any alert() function call" so every
-// alert_message is delivered to the relay webhook.
+// NOTE: each order fill delivers its alert_message via the placeholder
+// {{strategy.order.alert_message}} in the alert message box (see header).

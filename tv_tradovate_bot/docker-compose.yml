@@ -1,0 +1,35 @@
+# Relay + optional public tunnel.
+#
+#   docker compose up -d                     # relay only (reachable on :8000)
+#   docker compose --profile tunnel up       # relay + a public HTTPS URL
+#
+# With the tunnel profile, the cloudflared logs print a
+# https://<random>.trycloudflare.com URL -- append /webhook and paste that into
+# your TradingView alert. The quick tunnel needs no Cloudflare account and is
+# perfect for testing. For a stable production URL, use a named tunnel or your
+# own reverse proxy with TLS.
+services:
+  relay:
+    build: .
+    image: swingbot-relay:latest
+    env_file: .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate --url http://relay:8000
+    depends_on:
+      - relay
+    restart: unless-stopped
+    profiles: ["tunnel"]
