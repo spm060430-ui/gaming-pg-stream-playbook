@@ -238,6 +238,41 @@ class TradovateClient:
         return OrderResult(order_id=oid, symbol=symbol, action=action, qty=qty,
                            status=status, raw=data)
 
+    def place_stop_order(self, root: str, action: str, qty: int,
+                         stop_price: float) -> OrderResult:
+        """Place a resting GTC stop order (broker-enforced protection).
+
+        For a long position the protective order is a Sell Stop below entry;
+        for a short, a Buy Stop above entry. Returns the order id so the relay
+        can cancel it if the position is closed for another reason.
+        """
+        acct = self.get_account()
+        contract = self.find_front_month(root)
+        symbol = contract["name"]
+        body = {
+            "accountSpec": acct.spec,
+            "accountId": acct.id,
+            "action": action,           # "Sell" (protect long) / "Buy" (protect short)
+            "symbol": symbol,
+            "orderQty": int(qty),
+            "orderType": "Stop",
+            "stopPrice": round(float(stop_price), 4),
+            "timeInForce": "GTC",
+            "isAutomated": True,
+        }
+        data = self._post("/order/placeorder", body)
+        oid = data.get("orderId") or data.get("id")
+        log.info("STOP %s %s x%d @ %.4f -> %s", action, symbol, qty, stop_price,
+                 oid or data)
+        return OrderResult(order_id=oid, symbol=symbol, action=f"Stop/{action}",
+                           qty=qty, status="Submitted" if oid else str(data), raw=data)
+
+    def cancel_order(self, order_id) -> dict:
+        """Cancel a resting order (e.g. the protective stop) by id."""
+        data = self._post("/order/cancelorder", {"orderId": int(order_id)})
+        log.info("CANCEL order %s -> %s", order_id, data)
+        return data
+
     def flatten(self, root: str) -> OrderResult:
         """Close any open position in the front-month contract for root."""
         acct = self.get_account()

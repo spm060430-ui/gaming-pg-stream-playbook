@@ -24,6 +24,9 @@ class PositionMeta:
     entry_date: str
     stop: float
     contracts: int
+    # Id of the resting protective stop order placed at the broker, if any.
+    # Kept so we can cancel it when we exit for another reason.
+    stop_order_id: Optional[str] = None
 
     @property
     def entry_day(self) -> date:

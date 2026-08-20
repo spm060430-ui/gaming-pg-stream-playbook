@@ -240,8 +240,10 @@ Alert JSON contract (built by the Pine, validated by the relay):
 ## Risk management (all enforced server-side in the relay)
 
 - **Max 1–2 positions** (`MAX_OPEN_POSITIONS`) and per-symbol contract cap.
-- **ATR stop on every position**, set independently by the relay (not only by
-  TradingView) and re-checked each alert.
+- **ATR stop on every position** — placed as a **resting GTC stop order at
+  Tradovate** on entry (broker-enforced gap protection), cancelled automatically
+  when the position is closed for another reason, and re-checked at each alert as
+  a backstop.
 - **Whole-contract sizing** floored by `RISK_PER_TRADE_PCT` and a margin cap.
 - **Min-hold / swing guard** — no same-day round trips.
 - **Daily & weekly loss circuit breakers** — a trip **halts new entries** and
@@ -269,11 +271,13 @@ Alert JSON contract (built by the Pine, validated by the relay):
 
 - **Not financial advice.** A mechanical EMA/RSI crossover is a *starting
   template*, not an edge. Trend systems endure long, painful drawdowns.
-- **Software stops = gap risk.** The relay acts on bar-close alerts; a large move
-  between bars can blow through the stop. The Pine strategy also sets a native
-  stop for its own paper fills, but the relay-side stop is checked at alert time.
-  For hard protection you can extend `tradovate.py` to submit a resting stop
-  order alongside each entry (a natural next step).
+- **Stops: broker-enforced, with a caveat.** On each entry the relay submits a
+  **resting GTC stop order** to Tradovate (`USE_BROKER_STOP=true`), so the broker
+  enforces the stop even if no further alert arrives — this is the primary gap
+  protection. The relay's alert-time stop check and the Pine native stop are
+  backstops. Caveat: a stop order fills at the market *after* the stop is
+  touched, so a violent gap can still fill worse than the stop price — futures
+  are leveraged and this residual gap risk cannot be fully removed.
 - **Backtest ≠ live.** Synthetic results are illustrative; real fills, slippage,
   overnight gaps, and margin calls will differ. yfinance proxies (NQ=F/GC=F) are
   the index/gold underlying, not the exact micro contract.

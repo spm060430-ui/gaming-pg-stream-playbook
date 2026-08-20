@@ -78,6 +78,10 @@ class RiskParams:
     # Never let one position's margin exceed this fraction of equity.
     max_margin_pct: float = _f("MAX_MARGIN_PCT", 0.5)
     min_hold_days: int = _i("MIN_HOLD_DAYS", 1)  # swing, not intraday
+    # Place a resting GTC stop order at the broker on entry so the stop is
+    # enforced even if no alert arrives (gap protection). The relay's own
+    # alert-time stop check is a backstop, not the primary protection.
+    use_broker_stop: bool = _b("USE_BROKER_STOP", True)
 
     # --- Circuit breakers --------------------------------------------------
     daily_max_loss_pct: float = _f("DAILY_MAX_LOSS_PCT", 0.05)

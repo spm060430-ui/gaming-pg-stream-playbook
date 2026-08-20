@@ -150,17 +150,36 @@ def _handle_entry(cfg, broker, state: BotState, alert, today, equity, cb) -> Ale
         return AlertResult(True, "skipped", f"sizing: {sizing.reason}")
 
     action_word = "Buy" if side == "long" else "Sell"
+    stop_action = "Sell" if side == "long" else "Buy"
     order_id = None
+    stop_order_id = None
     if broker is None or cfg.relay.dry_run:
         detail = f"[dry-run] {action_word} {sizing.contracts}x {symbol}; {sizing.reason}"
+        if cfg.risk.use_broker_stop:
+            detail += f"; [dry-run] resting stop {stop_action} @ {sizing.stop_price}"
     else:
         res = broker.place_market_order(symbol, action_word, sizing.contracts)
         order_id = str(res.order_id) if res.order_id is not None else None
         detail = f"{action_word} {sizing.contracts}x {symbol} -> {res.status}; {sizing.reason}"
+        # Place the broker-enforced protective stop. If it fails, keep the
+        # position (already filled) but alert loudly -- we're now relying on the
+        # relay's alert-time stop only.
+        if cfg.risk.use_broker_stop:
+            try:
+                sres = broker.place_stop_order(
+                    symbol, stop_action, sizing.contracts, sizing.stop_price
+                )
+                stop_order_id = str(sres.order_id) if sres.order_id is not None else None
+                detail += f"; stop @ {sizing.stop_price} (id {stop_order_id})"
+            except Exception as e:  # noqa: BLE001
+                send_alert(cfg.notify, f"Protective stop FAILED for {symbol}",
+                           f"Position is open WITHOUT a broker stop: {e}", level="error")
+                detail += f"; STOP FAILED: {e}"
 
     state.positions[symbol] = PositionMeta(
         symbol=symbol, side=side, entry_price=alert["price"],
-        entry_date=today.isoformat(), stop=sizing.stop_price, contracts=sizing.contracts,
+        entry_date=today.isoformat(), stop=sizing.stop_price,
+        contracts=sizing.contracts, stop_order_id=stop_order_id,
     )
     return AlertResult(True, "entered", detail, order_id=order_id)
 
@@ -181,7 +200,17 @@ def _handle_exit(cfg, broker, state: BotState, alert, today, cb) -> AlertResult:
     order_id = None
     if broker is None or cfg.relay.dry_run:
         detail = f"[dry-run] flatten {symbol}"
+        if meta.stop_order_id:
+            detail += f"; [dry-run] cancel resting stop {meta.stop_order_id}"
     else:
+        # Cancel the resting protective stop first so it can't fill after we've
+        # already flattened (which would open an unwanted opposite position).
+        if meta.stop_order_id:
+            try:
+                broker.cancel_order(meta.stop_order_id)
+            except Exception as e:  # noqa: BLE001
+                log.warning("Could not cancel resting stop %s for %s: %s",
+                            meta.stop_order_id, symbol, e)
         res = broker.flatten(symbol)
         order_id = str(res.order_id) if res.order_id is not None else None
         detail = f"flatten {symbol} -> {res.status}"

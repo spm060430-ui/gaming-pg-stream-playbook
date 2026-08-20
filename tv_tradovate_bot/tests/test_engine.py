@@ -23,6 +23,16 @@ class FakeBroker:
         return OrderResult(order_id=len(self.orders), symbol=root, action=action,
                            qty=qty, status="Submitted", raw={})
 
+    def place_stop_order(self, root, action, qty, stop_price):
+        from swingbot.tradovate import OrderResult
+        self.orders.append(("stop", root, action, qty, stop_price))
+        return OrderResult(order_id=5000 + len(self.orders), symbol=root,
+                           action=f"Stop/{action}", qty=qty, status="Submitted", raw={})
+
+    def cancel_order(self, order_id):
+        self.orders.append(("cancel", order_id))
+        return {"orderId": order_id, "status": "Cancelled"}
+
     def flatten(self, root):
         from swingbot.tradovate import OrderResult
         self.orders.append(("flatten", root))
@@ -70,6 +80,8 @@ def test_entry_then_duplicate_then_exit():
         r1 = process_alert(_alert(), cfg, broker, today=date(2025, 1, 10))
         assert r1.action_taken == "entered"
         assert broker.orders and broker.orders[0][2] == "Buy"
+        # A resting protective stop (Sell Stop for the long) is placed on entry.
+        assert any(o[0] == "stop" and o[2] == "Sell" for o in broker.orders)
 
         # Duplicate id -> skipped, no new order.
         r2 = process_alert(_alert(), cfg, broker, today=date(2025, 1, 10))
@@ -85,6 +97,10 @@ def test_entry_then_duplicate_then_exit():
                            today=date(2025, 1, 12))
         assert r4.action_taken == "exited"
         assert broker.orders[-1][0] == "flatten"
+        # The resting stop is cancelled before the flatten (so it can't fill
+        # afterwards and open an opposite position).
+        kinds = [o[0] for o in broker.orders]
+        assert kinds.index("cancel") < kinds.index("flatten")
 
 
 def test_max_positions_blocks_second_symbol_when_capped():
