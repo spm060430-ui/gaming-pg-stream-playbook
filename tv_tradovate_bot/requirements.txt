@@ -1,0 +1,16 @@
+# Core (needed for backtest + risk engine)
+pandas>=2.0
+numpy>=1.24
+python-dotenv>=1.0
+
+# Relay webhook server + Tradovate HTTP client
+fastapi>=0.110
+uvicorn>=0.27
+requests>=2.31
+
+# Research data + plotting (optional but recommended)
+yfinance>=0.2.40
+matplotlib>=3.7
+
+# Testing
+pytest>=8.0

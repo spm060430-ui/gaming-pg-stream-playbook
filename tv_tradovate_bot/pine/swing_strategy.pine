@@ -1,0 +1,86 @@
+//@version=5
+// =============================================================================
+// EMA(10/30) crossover + RSI filter -- micro-futures swing strategy
+// -----------------------------------------------------------------------------
+// This is the LIVE brain. Add it to a TradingView chart of MNQ1! or MGC1! on a
+// DAILY (or 4H) timeframe. As a `strategy` it backtests and paper-trades
+// natively in TradingView; the alert() calls emit JSON webhooks that the Python
+// relay turns into Tradovate orders.
+//
+// Keep these inputs in sync with the Python config (swingbot/config.py) so the
+// research backtester and live trading agree.
+//
+// Alert wiring (see README): create ONE alert on this strategy with condition
+// "Any alert() function call", and paste {{strategy.order.alert_message}} as the
+// message (or leave the message box empty -- the alert_message we build below is
+// used). Point the webhook URL at your relay's /webhook endpoint.
+// =============================================================================
+strategy("Swing EMA+RSI (MNQ/MGC)", overlay=true, calc_on_every_tick=false,
+     pyramiding=0, default_qty_type=strategy.fixed, default_qty_value=1,
+     initial_capital=3000, commission_type=strategy.commission.cash_per_contract,
+     commission_value=0.35, process_orders_on_close=true)
+
+// --- Inputs (mirror swingbot/config.py) --------------------------------------
+emaFastLen   = input.int(10,   "EMA fast", minval=1)
+emaSlowLen   = input.int(30,   "EMA slow", minval=2)
+rsiLen       = input.int(14,   "RSI length", minval=2)
+rsiOverbought= input.float(70, "RSI overbought (block longs above)")
+rsiOversold  = input.float(30, "RSI oversold (block shorts below)")
+atrLen       = input.int(14,   "ATR length", minval=1)
+atrMult      = input.float(2.0,"Stop = ATR x", minval=0.1)
+allowShorts  = input.bool(false, "Allow shorts")
+webhookSecret= input.string("CHANGE_ME", "Webhook shared secret")
+alertSymbol  = input.string("MNQ", "Symbol tag sent to relay (MNQ or MGC)")
+
+// --- Indicators --------------------------------------------------------------
+emaFast = ta.ema(close, emaFastLen)
+emaSlow = ta.ema(close, emaSlowLen)
+rsiVal  = ta.rsi(close, rsiLen)
+atrVal  = ta.atr(atrLen)
+
+golden = ta.crossover(emaFast, emaSlow)
+death  = ta.crossunder(emaFast, emaSlow)
+
+longEntry  = golden and rsiVal <= rsiOverbought
+longExit   = death
+shortEntry = allowShorts and death and rsiVal >= rsiOversold
+shortExit  = allowShorts and golden
+
+// --- Plots -------------------------------------------------------------------
+plot(emaFast, "EMA fast", color=color.aqua)
+plot(emaSlow, "EMA slow", color=color.orange)
+
+// --- Helper: build the JSON payload the relay expects ------------------------
+f_msg(_action) =>
+    '{"secret":"' + webhookSecret + '",' +
+     '"id":"' + alertSymbol + '-' + str.tostring(timeframe.period) + '-' + str.tostring(time) + '",' +
+     '"action":"' + _action + '",' +
+     '"symbol":"' + alertSymbol + '",' +
+     '"price":' + str.tostring(close) + ',' +
+     '"atr":' + str.tostring(atrVal) + ',' +
+     '"rsi":' + str.tostring(rsiVal) + '}'
+
+// --- Strategy orders + ATR stop ----------------------------------------------
+// TradingView manages the stop for its own paper/backtest; the relay ALSO sets
+// an independent stop server-side. Both use ATR distance so they agree.
+longStop  = close - atrMult * atrVal
+shortStop = close + atrMult * atrVal
+
+if longEntry
+    strategy.entry("Long", strategy.long, alert_message=f_msg("long_entry"))
+if strategy.position_size > 0
+    strategy.exit("LongStop", from_entry="Long", stop=longStop)
+if longExit
+    strategy.close("Long", alert_message=f_msg("long_exit"))
+
+if allowShorts
+    if shortEntry
+        strategy.entry("Short", strategy.short, alert_message=f_msg("short_entry"))
+    if strategy.position_size < 0
+        strategy.exit("ShortStop", from_entry="Short", stop=shortStop)
+    if shortExit
+        strategy.close("Short", alert_message=f_msg("short_exit"))
+
+// NOTE: alert_message on entry/exit fires only when the corresponding order
+// executes. Create the alert with "Any alert() function call" so every
+// alert_message is delivered to the relay webhook.
